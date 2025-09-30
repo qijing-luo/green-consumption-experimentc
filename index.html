@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>绿色消费实验</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body { 
+            font-family: 'Microsoft YaHei', Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px;
+            background-color: #2e7d32;
+            color: white;
+            line-height: 1.6;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 15px;
+            padding: 25px;
+            color: #333;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #2e7d32;
+        }
+        
+        .header h1 {
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .header p {
+            color: #4caf50;
+            font-size: 16px;
+        }
+        
+        #chat-container { 
+            border: 2px solid #64b5f6;
+            border-radius: 15px;
+            height: 400px; 
+            overflow-y: auto; 
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #e3f2fd;
+        }
+        
+        .user-message { 
+            background: #bbdefb;
+            padding: 12px 15px;
+            border-radius: 15px 15px 0 15px;
+            margin: 10px 0;
+            max-width: 80%;
+            margin-left: auto;
+            border: 1px solid #90caf9;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .ai-message { 
+            background: #c8e6c9;
+            padding: 12px 15px;
+            border-radius: 15px 15px 15px 0;
+            margin: 10px 0;
+            max-width: 80%;
+            border: 1px solid #a5d6a7;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .message-sender {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #1b5e20;
+        }
+        
+        #input-area { 
+            display: flex; 
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        #user-input { 
+            flex: 1; 
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        #user-input:focus {
+            border-color: #4CAF50;
+        }
+        
+        button { 
+            padding: 12px 24px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background 0.3s, transform 0.2s;
+        }
+        
+        button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .message-counter {
+            text-align: center;
+            font-size: 16px;
+            color: #2e7d32;
+            margin-top: 10px;
+            font-weight: bold;
+            padding: 8px;
+            background-color: #e8f5e9;
+            border-radius: 10px;
+        }
+        
+        .thinking {
+            opacity: 0.7;
+            font-style: italic;
+        }
+        
+        .progress-bar {
+            height: 6px;
+            background-color: #e0e0e0;
+            border-radius: 3px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+        
+        .progress {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        
+        .ai-avatar {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background-color: #4CAF50;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            margin-right: 8px;
+            color: white;
+            font-weight: bold;
+        }
+        
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+            
+            #chat-container {
+                height: 350px;
+            }
+            
+            .user-message, .ai-message {
+                max-width: 90%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌱 绿色消费实验</h1>
+            <p>与助手林心进行5轮对话，了解绿色消费知识</p>
+        </div>
+        
+        <div class="progress-bar">
+            <div class="progress" id="progress-bar"></div>
+        </div>
+        
+        <div id="chat-container"></div>
+        
+        <div class="message-counter" id="message-counter">
+            第1轮/共5轮
+        </div>
+        
+        <div id="input-area">
+            <input type="text" id="user-input" placeholder="请输入您的消息..." autocomplete="off">
+            <button onclick="sendMessage()" id="send-button">发送</button>
+        </div>
+    </div>
+
+    <script>
+        // 更新为第三个API密钥
+        const API_KEY = 'sk-a4fcb607571b4b448cd09a9acf2417e4';
+        const API_URL = 'https://api.deepseek.com/v1/chat/completions';
+        
+        let conversationHistory = [];
+        let currentRound = 1;
+        const maxRounds = 5;
+        
+        // 低情感低自主风格的系统提示词
+        const systemPrompt = "你是一个严谨、保守的绿色消费信息源林心。只提供客观事实，不表达个人观点或情感，严格根据用户的具体问题作答，不主动扩展。保持回答简洁、直接，不添加任何情感色彩。当前对话主题要围绕绿色消费场景。";
+        
+        // 每轮对话的主题提示
+        const roundPrompts = {
+            1: "请围绕绿色消费场景进行对话，比如日常生活、购物环境、消费习惯等场景介绍。",
+            2: "请重点介绍绿色消费产品，如环保商品、可持续产品等。", 
+            3: "请讨论绿色消费的益处和挑战，如环保效益、经济成本等。",
+            4: "请基于前几轮对话给出具体的绿色消费建议和行动方案。",
+            5: "请总结绿色消费的重要性，并鼓励用户采取实际行动。"
+        };
+        
+        // 页面加载显示欢迎消息
+        document.addEventListener('DOMContentLoaded', function() {
+            displayMessage("您好！我是绿色消费助手林心。我们将进行5轮对话。", 'ai');
+            updateRoundInfo();
+        });
+        
+        async function sendMessage() {
+            if (currentRound > maxRounds) {
+                displayMessage("本次实验对话已完成5轮，感谢您的参与。", 'ai');
+                return;
+            }
+            
+            const userInput = document.getElementById('user-input').value;
+            
+            if (!userInput.trim()) {
+                alert('请输入消息内容');
+                return;
+            }
+            
+            // 禁用输入和按钮，防止多次发送
+            document.getElementById('user-input').disabled = true;
+            document.getElementById('send-button').disabled = true;
+            
+            displayMessage(userInput, 'user');
+            document.getElementById('user-input').value = '';
+            
+            // 根据当前轮次构建完整提示词
+            const fullPrompt = `${systemPrompt} ${roundPrompts[currentRound]}`;
+            
+            // 显示"AI正在思考..."
+            const thinkingMsg = displayMessage("林心正在思考...", 'ai');
+            thinkingMsg.classList.add('thinking');
+            
+            const messages = [
+                { role: "system", content: fullPrompt },
+                ...conversationHistory,
+                { role: "user", content: userInput }
+            ];
+            
+            try {
+                console.log('发送请求到DeepSeek API...');
+                
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        model: "deepseek-chat",
+                        messages: messages,
+                        temperature: 0.3, // 降低temperature，使回答更加稳定和客观
+                        max_tokens: 600   // 减少最大token数，使回答更简洁
+                    })
+                });
+                
+                console.log('收到响应，状态码:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API请求失败: ${response.status} - ${errorText}`);
+                }
+                
+                const data = await response.json();
+                console.log('API响应数据:', data);
+                
+                // 移除"正在思考"消息
+                thinkingMsg.remove();
+                
+                if (data.choices && data.choices[0]) {
+                    const aiReply = data.choices[0].message.content;
+                    displayMessage(aiReply, 'ai');
+                    
+                    // 保存对话历史
+                    conversationHistory.push(
+                        { role: "user", content: userInput },
+                        { role: "assistant", content: aiReply }
+                    );
+                    
+                    // 进入下一轮
+                    currentRound++;
+                    updateRoundInfo();
+                    
+                } else {
+                    throw new Error('API返回数据格式异常');
+                }
+                
+            } catch (error) {
+                console.error('完整错误信息:', error);
+                
+                // 移除"正在思考"消息
+                thinkingMsg.remove();
+                
+                // 显示友好的错误信息
+                let errorMessage = "抱歉，对话出现错误，请稍后重试。";
+                if (error.message.includes('401')) {
+                    errorMessage = "API密钥验证失败，请检查密钥是否正确。";
+                } else if (error.message.includes('429')) {
+                    errorMessage = "请求过于频繁，请稍后再试。";
+                } else if (error.message.includes('network') || error.message.includes('Network')) {
+                    errorMessage = "网络连接问题，请检查网络后重试。";
+                }
+                
+                displayMessage(errorMessage, 'ai');
+            }
+            
+            // 重新启用输入和按钮
+            document.getElementById('user-input').disabled = false;
+            document.getElementById('send-button').disabled = false;
+            document.getElementById('user-input').focus();
+        }
+        
+        function displayMessage(message, sender) {
+            const chatContainer = document.getElementById('chat-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = sender + '-message';
+            
+            let senderName = sender === 'user' ? '您' : '<span class="ai-avatar">林</span>林心';
+            messageDiv.innerHTML = `<div class="message-sender">${senderName}</div>${message}`;
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            return messageDiv;
+        }
+        
+        function updateRoundInfo() {
+            const messageCounter = document.getElementById('message-counter');
+            const progressBar = document.getElementById('progress-bar');
+            
+            if (currentRound <= maxRounds) {
+                messageCounter.textContent = `第${currentRound}轮/共5轮`;
+                
+                // 更新进度条
+                const progress = ((currentRound-1) / maxRounds) * 100;
+                progressBar.style.width = `${progress}%`;
+            } else {
+                messageCounter.textContent = "对话已完成 - 感谢您的参与";
+                document.getElementById('user-input').placeholder = "对话已结束";
+                
+                // 完成进度条
+                progressBar.style.width = "100%";
+            }
+        }
+        
+        // 回车发送消息
+        document.getElementById('user-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // 页面加载后自动聚焦到输入框
+        document.getElementById('user-input').focus();
+    </script>
+</body>
+</html>
